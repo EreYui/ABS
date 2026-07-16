@@ -1,6 +1,6 @@
 <?xml version='1.0' encoding='utf-8'?>
 <robot name="go2_description">
-  <!--Derived from /data/re/isaacgym_ws/datasets/go2_description.zip. Mesh package URLs are rewritten to relative paths for Isaac Gym; thigh collision boxes follow the official Isaac Gym amendment note.-->
+  <!--Derived from the upstream GO2 description package. Mesh package URLs are rewritten to relative paths for Isaac Gym; thigh collision boxes follow the official Isaac Gym amendment note.-->
   <link name="base">
     <inertial>
       <origin xyz="0.021112 0 -0.005366" rpy="0 0 0" />

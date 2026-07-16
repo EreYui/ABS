@@ -11,8 +11,18 @@ import copy
 
 import torchvision
 from torchvision import models
-from tqdm import tqdm
-import cv2
+from legged_gym import LEGGED_GYM_ROOT_DIR
+
+try:
+    import cv2
+except ImportError:
+    cv2 = None
+
+try:
+    from tqdm import tqdm
+except ImportError:
+    def tqdm(iterable, *args, **kwargs):
+        return iterable
 
 class CustomDataset(Dataset):
     def __init__(self, all_dataset):
@@ -49,14 +59,17 @@ class ResNetModel(torch.nn.Module):
 
 def train(args):
     datetime_now = datetime.now().strftime("%Y%m%d-%H%M%S")
-    log_folder = '../depth_logs/{}-{}-{}'.format(datetime_now, args.resnet_type, args.exp_name)
+    log_folder = os.path.join(LEGGED_GYM_ROOT_DIR, 'depth_logs', '{}-{}-{}'.format(datetime_now, args.resnet_type, args.exp_name))
     tensorboard_writer = SummaryWriter(log_dir=log_folder)
 
     
     # ============================== load data ==============================
     print("==============================loading data ==============================")
-    data_folder = "../depth_data/rec_cam/"
-    all_test_folder = os.listdir(data_folder)
+    data_folder = args.data_dir if args.data_dir else os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', args.data_name)
+    if not os.path.isdir(data_folder):
+        raise FileNotFoundError(f"Depth dataset folder does not exist: {data_folder}")
+    print("Data folder: {}".format(data_folder))
+    all_test_folder = [folder for folder in os.listdir(data_folder) if os.path.isfile(os.path.join(data_folder, folder, 'label.pkl'))]
     all_test_folder.sort()
     print(all_test_folder)
     all_dataset = {}
@@ -64,8 +77,8 @@ def train(args):
     if args.leftright_augmentation:
         print("Using left-right image augmentation, will double the number of data.")
     for folder_this_test in all_test_folder:
-        data_folder_for_this_test = data_folder + folder_this_test
-        with open(data_folder_for_this_test+ '/label.pkl', 'rb') as f:
+        data_folder_for_this_test = os.path.join(data_folder, folder_this_test)
+        with open(os.path.join(data_folder_for_this_test, 'label.pkl'), 'rb') as f:
             _label = pickle.load(f)
             print("Loaded label for {}".format(folder_this_test))
             print("Number of data for this test: {}".format(len(_label)))
@@ -74,7 +87,7 @@ def train(args):
         for image_name in all_image:
             image_idx = image_name.split('.')[0]
             assert image_idx in _label.keys()
-            image_path = data_folder_for_this_test + '/' + image_name
+            image_path = os.path.join(data_folder_for_this_test, image_name)
 
             image = np.load(image_path, allow_pickle=True)
             all_dataset["{}_{}".format(folder_this_test, image_idx)] = [np.log2(image), np.log2(_label[image_idx])]
@@ -82,6 +95,8 @@ def train(args):
         print("Total number of data: {}".format(len(all_dataset)))
             
     print("Total number of data: {}".format(len(all_dataset)))
+    if len(all_dataset) == 0:
+        raise RuntimeError(f"No depth dataset samples found in {data_folder}")
     # Create a custom dataset instance
     dataset = CustomDataset(all_dataset)
 
@@ -209,6 +224,8 @@ def get_args():
     parser.add_argument('--leftright_augmentation', type=bool, default=True, help='Whether to use left-right image augmentation.')
     parser.add_argument('--exp_name', type=str, default='', help='Experiment name.')
     parser.add_argument('--resnet_type', type=str, default='resnet18', help='ResNet model.')
+    parser.add_argument('--data_name', type=str, default='rec_cam', help='Dataset folder name under <LEGGED_GYM_ROOT_DIR>/logs.')
+    parser.add_argument('--data_dir', type=str, default=None, help='Absolute dataset folder path. Overrides --data_name when set.')
     # Noise augmentation
     parser.add_argument('--noise_augmentation', type=bool, default=True, help='Whether to use noise augmentation.')
     parser.add_argument('--noise_augmentation_std_max', type=float, default=0.3, help='Standard deviation of the noise augmentation.')

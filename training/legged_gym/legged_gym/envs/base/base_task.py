@@ -52,9 +52,12 @@ class BaseTask():
         else:
             self.device = 'cpu'
 
-        # graphics device for rendering, -1 for no rendering
+        # graphics device for rendering, -1 for no rendering. Depth camera tensors
+        # still need a graphics device even when no viewer is created.
         self.graphics_device_id = self.sim_device_id
-        if self.headless == True:
+        depth_cam_cfg = getattr(getattr(cfg, "sensors", None), "depth_cam", None)
+        needs_camera_rendering = bool(getattr(depth_cam_cfg, "enable", False))
+        if self.headless == True and not needs_camera_rendering:
             self.graphics_device_id = -1
 
         self.num_envs = cfg.env.num_envs

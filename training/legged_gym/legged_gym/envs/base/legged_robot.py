@@ -87,7 +87,6 @@ class LeggedRobot(BaseTask):
         self.actions = torch.clip(actions, -clip_actions, clip_actions).to(self.device)
         # step physics and render each frame
         
-        if self.cfg.sensors.depth_cam.enable: self.render_cameras()
         for _ in range(self.cfg.control.decimation):
             self.torques = self._compute_torques(self.actions).view(self.torques.shape)
             self.gym.set_dof_actuation_force_tensor(self.sim, gymtorch.unwrap_tensor(self.torques))
@@ -96,6 +95,7 @@ class LeggedRobot(BaseTask):
                 self.gym.fetch_results(self.sim, True)
             self.gym.refresh_dof_state_tensor(self.sim)
         self.post_physics_step()
+        if self.cfg.sensors.depth_cam.enable: self.render_cameras()
         self.render()
 
         # return clipped obs, clipped states (None), rewards, dones and infos
@@ -764,6 +764,7 @@ class LeggedRobot(BaseTask):
         self.dof_names = self.gym.get_asset_dof_names(robot_asset)
         self.num_bodies = len(body_names)
         self.num_dofs = len(self.dof_names)
+        camera_body_name = "trunk" if "trunk" in body_names else body_names[0]
         feet_names = [s for s in body_names if self.cfg.asset.foot_name in s]
         penalized_contact_names = []
         for name in self.cfg.asset.penalize_contacts_on:
@@ -855,7 +856,8 @@ class LeggedRobot(BaseTask):
 
             if self.cfg.sensors.depth_cam.enable:
                 cam_handle = self.gym.create_camera_sensor(env_handle, camera_props)
-                self.gym.attach_camera_to_body(cam_handle, env_handle, actor_handle, camera_transform, gymapi.FOLLOW_TRANSFORM)
+                camera_body_handle = self.gym.find_actor_rigid_body_handle(env_handle, actor_handle, camera_body_name)
+                self.gym.attach_camera_to_body(cam_handle, env_handle, camera_body_handle, camera_transform, gymapi.FOLLOW_TRANSFORM)
                 self.camera_handles.append(cam_handle)
                 camera_tensor = self.gym.get_camera_image_gpu_tensor(self.sim, env_handle, cam_handle, gymapi.IMAGE_DEPTH)
                 torch_cam_tensor = gymtorch.wrap_tensor(camera_tensor)
@@ -975,6 +977,9 @@ class LeggedRobot(BaseTask):
         return
 
     def render_cameras(self):        
+        if self.device != 'cpu':
+            self.gym.fetch_results(self.sim, True)
+        self.gym.step_graphics(self.sim)
         self.gym.render_all_camera_sensors(self.sim)
         self.gym.start_access_image_tensors(self.sim)
         self.dump_depth()

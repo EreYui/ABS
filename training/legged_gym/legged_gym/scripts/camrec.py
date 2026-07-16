@@ -84,11 +84,10 @@ def play(args):
     camera_direction = np.array(env_cfg.viewer.lookat) - np.array(env_cfg.viewer.pos)
     img_idx = 0
 
-    log_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs/rec_cam')
-    try:
-        os.mkdir(log_root)
-    except:
-        pass
+    rec_cam_dir = 'rec_cam_go2' if args.task.startswith('go2_') else 'rec_cam'
+    log_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', rec_cam_dir)
+    os.makedirs(log_root, exist_ok=True)
+    print('recording camera data to', log_root)
     log_folder = 'test' + str(len(os.listdir(log_root)) + 10 + 1)
     # this '10' is a shift in the filename, so you may change it and run multiple parallel ones without conflicts
     last_log_folder = 'test' + str(len(os.listdir(log_root)) + 10)
